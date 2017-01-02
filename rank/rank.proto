@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+option optimize_for = SPEED;
+option cc_generic_services = false;
+
+message CCSUsrMsg_ServerRankUpdate {
+	message RankUpdate {
+		optional int32 account_id = 1;
+		optional int32 rank_old = 2;
+		optional int32 rank_new = 3;
+		optional int32 num_wins = 4;
+		optional float rank_change = 5;
+	}
+
+	repeated .CCSUsrMsg_ServerRankUpdate.RankUpdate rank_update = 1;
+}
