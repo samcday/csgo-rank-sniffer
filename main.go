@@ -3,10 +3,19 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 
+	"reflect"
+
+	steam "github.com/Philipp15b/go-steam"
+	"github.com/Philipp15b/go-steam/netutil"
+	"github.com/Philipp15b/go-steam/protocol/gamecoordinator"
+	"github.com/Philipp15b/go-steam/protocol/steamlang"
 	"github.com/Philipp15b/go-steam/steamid"
+	"github.com/Philipp15b/go-steam/tf2/protocol/protobuf"
 	"github.com/golang/protobuf/proto"
 	"github.com/samcday/csgo-rank-sniffer/rank"
 	camelcase "github.com/segmentio/go-camelcase"
@@ -62,6 +71,89 @@ func mapGameEventKeyValue(valueType int32, key *protom.CSVCMsg_GameEventKeyT) in
 }
 
 func main() {
+	// readDemo()
+	playWithGC()
+}
+
+type gcHandler struct {
+}
+
+func (*gcHandler) HandleGCPacket(p *gamecoordinator.GCPacket) {
+	fmt.Printf("GC PACKET! %s\n", protobuf.EGCBaseClientMsg_name[int32(p.MsgType)])
+	json.NewEncoder(os.Stdout).Encode(p)
+	fmt.Println("----------")
+}
+
+func playWithGC() {
+	c := steam.NewClient()
+	if _, err := os.Stat("servers.json"); err == nil {
+		fmt.Println("Using local CM server list")
+		f, err := os.Open("servers.json")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		var servers []netutil.PortAddr
+		json.NewDecoder(f).Decode(&servers)
+		fmt.Println("Connecting to", servers[0])
+		c.ConnectTo(&servers[0])
+	} else {
+		c.Connect()
+	}
+
+	c.GC.RegisterPacketHandler(&gcHandler{})
+
+	for event := range c.Events() {
+		switch e := event.(type) {
+		case *steam.ConnectedEvent:
+			fmt.Println("Connected. Sending auth")
+			var sentryHash steam.SentryHash
+			if _, err := os.Stat("sentry.hash"); err == nil {
+				raw, err := ioutil.ReadFile("sentry.hash")
+				if err != nil {
+					panic(err)
+				}
+				sentryHash = steam.SentryHash(raw)
+			}
+
+			if sentryHash != nil {
+				fmt.Printf("Using sentry hash with length %d\n", len(sentryHash))
+			}
+			c.Auth.LogOn(&steam.LogOnDetails{
+				Username:       os.Getenv("STEAM_USER"),
+				Password:       os.Getenv("STEAM_PASS"),
+				SentryFileHash: sentryHash,
+			})
+		case *steam.DisconnectedEvent:
+			fmt.Println("Disconnected onoes")
+		case *steam.LogOnFailedEvent:
+			fmt.Printf("Logon failed: %v\n", e.Result)
+		case *steam.MachineAuthUpdateEvent:
+			fmt.Printf("Wrote sentry hash with length %d\n", len(e.Hash))
+			ioutil.WriteFile("sentry.hash", e.Hash, os.FileMode(0644))
+		case *steam.ClientCMListEvent:
+			fmt.Println("Got CM list")
+			d, err := json.Marshal(e.Addresses)
+			if err != nil {
+				panic(err)
+			}
+			err = ioutil.WriteFile("servers.json", d, 0666)
+			if err != nil {
+				panic(err)
+			}
+		case *steam.LoggedOnEvent:
+			fmt.Println("Logged on!")
+			c.Social.SetPersonaState(steamlang.EPersonaState_Online)
+			c.GC.SetGamesPlayed(730)
+		case error:
+			fmt.Println("Ohnoes error %v\n", e)
+		default:
+			fmt.Printf("Got unhandled packet %s\n", reflect.TypeOf(event).Elem().Name())
+		}
+	}
+}
+
+func readDemo() {
 	f, err := os.Open("match730_003180245891948740689_1625585345_115.dem")
 	if err != nil {
 		panic(err)
