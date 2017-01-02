@@ -8,7 +8,7 @@ import (
 
 	"github.com/Philipp15b/go-steam/steamid"
 	"github.com/golang/protobuf/proto"
-	"github.com/samcday/csgo-demo-parser/rank"
+	"github.com/samcday/csgo-rank-sniffer/rank"
 	camelcase "github.com/segmentio/go-camelcase"
 	"github.com/stegmannc/csgo-demoparser"
 	"github.com/stegmannc/csgo-demoparser/protom"
