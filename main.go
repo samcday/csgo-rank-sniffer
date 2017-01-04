@@ -5,10 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 
 	"reflect"
+
+	"time"
 
 	steam "github.com/Philipp15b/go-steam"
 	"github.com/Philipp15b/go-steam/netutil"
@@ -49,6 +52,15 @@ func readString(r *bufio.Reader) string {
 		panic(err)
 	}
 	return s
+}
+
+type MsgClientHello struct {
+	Version uint32
+}
+
+func (m *MsgClientHello) Serialize(w io.Writer) error {
+	err := binary.Write(w, binary.LittleEndian, m.Version)
+	return err
 }
 
 func mapGameEventKeyValue(valueType int32, key *protom.CSVCMsg_GameEventKeyT) interface{} {
@@ -145,6 +157,9 @@ func playWithGC() {
 			fmt.Println("Logged on!")
 			c.Social.SetPersonaState(steamlang.EPersonaState_Online)
 			c.GC.SetGamesPlayed(730)
+
+			time.Sleep(3 * time.Second)
+			c.GC.Write(gamecoordinator.NewGCMsg(730, uint32(protobuf.EGCBaseClientMsg_k_EMsgGCClientHello), &MsgClientHello{}))
 		case error:
 			fmt.Println("Ohnoes error %v\n", e)
 		default:
