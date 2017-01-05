@@ -43,6 +43,7 @@ steamClient.on('logOnResponse', function() {
     var info = watch.watchable_match_infos[0];
     console.log('GOTV available @ ', ip.fromLong(info.server_ip) + ':' + info.tv_port);
     console.log('Password: ', info.tv_watch_password.toString('utf8'));
+    console.log('cl_decryptdata_key_pub:', info.cl_decryptdata_key_pub);
   });
 });
 
